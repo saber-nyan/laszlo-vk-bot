@@ -19,7 +19,8 @@ setup(
     url='https://github.com/saber-nyan/laszlo-vk-bot',
     license='WTFPL',
     install_requires=[
-        'vk_api'
+        'vk_api',
+        'schedule',
     ],
     packages=find_packages(),
     include_package_data=True

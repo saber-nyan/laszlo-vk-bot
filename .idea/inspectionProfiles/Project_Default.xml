@@ -12,7 +12,7 @@
     <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="ignoredPackages">
         <value>
-          <list size="7">
+          <list size="8">
             <item index="0" class="java.lang.String" itemvalue="telebot" />
             <item index="1" class="java.lang.String" itemvalue="requests" />
             <item index="2" class="java.lang.String" itemvalue="vk_api" />
@@ -20,6 +20,7 @@
             <item index="4" class="java.lang.String" itemvalue="PIL" />
             <item index="5" class="java.lang.String" itemvalue="magic" />
             <item index="6" class="java.lang.String" itemvalue="puremagic" />
+            <item index="7" class="java.lang.String" itemvalue="schedule" />
           </list>
         </value>
       </option>

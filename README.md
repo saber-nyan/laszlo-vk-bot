@@ -8,4 +8,5 @@
 
 Спасибо, [Дихлорид Карбонила](https://vk.com/id370446158)!
 
-Используется [vk_api](https://github.com/python273/vk_api).
+Используется [vk_api](https://github.com/python273/vk_api),
+[schedule](https://github.com/dbader/schedule).

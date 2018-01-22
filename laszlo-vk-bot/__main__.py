@@ -2,45 +2,52 @@
 """
 Наш основной модуль~
 """
-import argparse
+import logging
 import os
 import random
+import re
 import signal
 import string
 import sys
 import tempfile
 import time
-import traceback
 
 import schedule
 from vk_api import vk_api
 
+try:
+    from . import config
+except ImportError:
+    import config
+
 EXIT_SUCCESS = 0  # По сигналу
 EXIT_VK_API = 1  # Ошибка vk_api
-EXIT_ARGUMENTS = 2  # Некорректные аргументы
+EXIT_ENV = 2  # Некорректные переменные среды
 EXIT_UNKNOWN = 256  # Неведомая хрень
 
 VK_VER = 5.71  # Последняя версия на 2018.01.22
 
-args: argparse.Namespace
+log: logging.Logger
 vk: vk_api.VkApiMethod
+group_id: int
 
 
 def test_job():
-    print("test job started!")
+    log.debug("Запущено тестовое задание!")
     guid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
-    print("posting w/ guid {}...".format(guid))
-    result = vk.wall.post(  # FIXME: У аутентификации группы не хватает прав для wall.*
-        owner_id="-{}".format(args.group_id),
+    log.debug("Пост с guid {}...".format(guid))
+    result = vk.wall.post(
+        owner_id="-{}".format(group_id),
         from_group=1,
         message="test message from vk_api!\nw/ guid = {}".format(guid),
         signed=1
     )
-    print("result: {}".format(result))
+    log.debug("Результат: {}".format(result))
 
 
 def change_rule_of_the_day():
-    print("changing rule to... {}")
+    log.info("Правило дня изменяется на {}!")
+
 
 def main():
     """
@@ -48,69 +55,49 @@ def main():
 
     :return: код возврата
     """
-    arg_parser = argparse.ArgumentParser(
-        prog="laszlo-vk-bot",
-        description="Бот для автообновления правил в сообществе VK.",
-        epilog="При проблемах пишите в https://github.com/saber-nyan/laszlo-vk-bot/issues",
-        add_help=True
-    )
-    arg_parser.add_argument(
-        '--debug',
-        action='store_true',
-        help='Режим отладки, не трогать'
-    )
-    arg_parser.add_argument(
-        '-d', '--days',
-        action='store',
-        default=1,
-        type=int,
-        help="Количество дней до смены правил",
-        metavar="ДНЕЙ",
-        dest='days'
-    )
-    arg_parser.add_argument(
-        '-i', '--group-id',
-        action='store',
-        required=True,
-        type=int,
-        help="ID сообщества, см. README.md",
-        metavar="ID",
-        dest='group_id'
-    )
-    arg_parser.add_argument(
-        '-t', '--token',
-        action='store',
-        required=True,
-        type=str,
-        help="Токен API, см. README.md",
-        metavar="ТОКЕН",
-        dest='api_token'
-    )
-    global args
-    args = arg_parser.parse_args()
 
-    print('init vk_api...')
-    # noinspection PyBroadException,PyUnusedLocal
+    # noinspection PyBroadException
+    try:
+        access_token_regex = re.compile(r'access_token=(.*?)&')
+        access_token = access_token_regex.findall(config.ACCESS_TOKEN_LINK)[0]
+    except:
+        log.critical("Неправильно задан ACCESS_TOKEN_LINK.\n\nПодробнее:\n",
+                     exc_info=1)
+        return EXIT_ENV
+
+    log.info('Инициализация vk_api...')
+    # noinspection PyBroadException
     try:
         vk_session = vk_api.VkApi(
-            token=args.api_token,
+            token=access_token,
             config_filename=os.path.join(tempfile.gettempdir(), 'laszlo_vk_data.json'),
             api_version=str(VK_VER)
         )
-        # vk_session.auth(token_only=True)
         global vk
         vk = vk_session.get_api()
-    except Exception as e:
-        err_msg = "Ошибка при попытке залогиниться!\n\nПодробнее:\n{}".format(
-            traceback.format_exc()
-        )
-        print(err_msg, file=sys.stderr)
+        log.info('...успех!')
+    except:
+        log.critical("Ошибка при попытке залогиниться!\n\nПодробнее:\n",
+                     exc_info=1)
         return EXIT_VK_API
 
-    if args.debug:
-        schedule.every(2).seconds.do(test_job).tag('test-job')
+    log.info("Определение id группы...")
+    # noinspection PyBroadException
+    try:
+        group_short_name = config.GROUP_LINK.split('/')[-1]
+        global group_id
+        group_id = vk.groups.getById(group_id=group_short_name,
+                                     version=VK_VER)[0]["id"]
+        log.info("...успех! ID = {}".format(group_id))
+    except:
+        log.critical("Неправильно задана ссылка на группу.\n\nПодробнее:\n",
+                     exc_info=1)
+        return EXIT_ENV
+
+    if config.DEBUG:
+        schedule.every(2).days.do(test_job).tag('test-job')
     else:
-        schedule.every(args.days).do()
+        schedule.every(config.DAYS).do()
 
     while True:
         schedule.run_pending()
@@ -125,18 +112,28 @@ def exit_handler(sig, frame):
     :param sig: тип сигнала, здесь ``SIGINT`` или ``SIGTERM``
     :param frame: фрейм, во время выполнения которого был пойман сигнал
     """
-    print("stopping...")
+    log.info("Остановка...")
     sys.exit(EXIT_SUCCESS)
 
 
 if __name__ == '__main__':
     print("init...")
+
+    l_logger = logging.getLogger()
+    l_logger.setLevel(config.LOG_LEVEL)
+    l_logger_sh = logging.StreamHandler()
+    l_logger_sh.setFormatter(logging.Formatter(config.LOG_FORMAT))
+    l_logger_sh.setLevel(config.LOG_LEVEL)
+    l_logger.addHandler(l_logger_sh)
+
+    log = l_logger
+
     signal.signal(signal.SIGINT, exit_handler)
     signal.signal(signal.SIGTERM, exit_handler)
     # noinspection PyBroadException
     try:
         sys.exit(main())
-    except Exception as exc:
+    except Exception:
         err_str = """
 Случилась неведомая хрень...
 
@@ -144,6 +141,6 @@ if __name__ == '__main__':
 Напишите в https://github.com/saber-nyan/laszlo-vk-bot/issues или на
 saber-nyan@ya.ru и приложите:
 
-{}""".format(traceback.format_exc())
-        print(err_str, file=sys.stderr)
+"""
+        log.critical(err_str, exc_info=1)
         sys.exit(EXIT_UNKNOWN)

@@ -11,7 +11,9 @@ import string
 import sys
 import tempfile
 import time
+from typing import Dict, List
 
+import cson
 import schedule
 from vk_api import vk_api
 
@@ -23,12 +25,14 @@ except ImportError:
 EXIT_SUCCESS = 0  # По сигналу
 EXIT_VK_API = 1  # Ошибка vk_api
 EXIT_ENV = 2  # Некорректные переменные среды
+EXIT_PARSE = 4  # Ошибка открытия/парсинга
 EXIT_UNKNOWN = 256  # Неведомая хрень
 
 VK_VER = 5.71  # Последняя версия на 2018.01.22
 
 log: logging.Logger
 vk: vk_api.VkApiMethod
+rules: List[Dict[str, str]]  # см. rules_example.cson
 group_id: int
 
 
@@ -39,7 +43,7 @@ def test_job():
     result = vk.wall.post(
         owner_id="-{}".format(group_id),
         from_group=1,
-        message="test message from vk_api!\nw/ guid = {}".format(guid),
+        message="{}".format(random.choice(rules)["post_msg"]),  # TODO: dehardcode
         signed=1
     )
     log.debug("Результат: {}".format(result))
@@ -65,7 +69,19 @@ def main():
                      exc_info=1)
         return EXIT_ENV
 
-    log.info('Инициализация vk_api...')
+    log.info("Парсинг файла правил...")
+    # noinspection PyBroadException
+    try:
+        with open(config.RULES_PATH, 'rb') as file:
+            global rules
+            rules = cson.load(file)
+        log.info("...успех! Количество записей: {}".format(len(rules)))
+    except:
+        log.critical("Ошибка при открытии/парсинге!\n\nПодробнее:\n",
+                     exc_info=1)
+        return EXIT_PARSE
+
+    log.info("Инициализация vk_api...")
     # noinspection PyBroadException
     try:
         vk_session = vk_api.VkApi(
@@ -95,7 +111,7 @@ def main():
         return EXIT_ENV
 
     if config.DEBUG:
-        schedule.every(2).days.do(test_job).tag('test-job')
+        schedule.every(10).seconds.do(test_job).tag('test-job')
     else:
         schedule.every(config.DAYS).do()
 

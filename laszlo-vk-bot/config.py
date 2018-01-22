@@ -17,9 +17,10 @@ except ImportError:
 # (Мало ли на что еще DEBUG сработает, например?)
 
 # noinspection PyBroadException
-try:
-    GROUP_LINK = os.environ['LASZLO_GROUP_LINK']  # ссылка на группу, см. README.md
-    ACCESS_TOKEN_LINK = os.environ['LASZLO_ACCESS_TOKEN_LINK']  # Token, см. README.md
+try:  # см. README.md!
+    RULES_PATH = os.path.expanduser(os.environ['LASZLO_RULES_PATH'])  # Путь до файла правил
+    GROUP_LINK = os.environ['LASZLO_GROUP_LINK']  # Ссылка на группу
+    ACCESS_TOKEN_LINK = os.environ['LASZLO_ACCESS_TOKEN_LINK']  # API Token
 except:
     print("Необходимые переменные окружения не найдены или заданы неверно.\n"
           "Пожалуйста, перечитайте README.md!", file=sys.stderr)

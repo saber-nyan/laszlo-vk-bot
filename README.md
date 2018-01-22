@@ -9,7 +9,8 @@
 Спасибо, [Дихлорид Карбонила](https://vk.com/id370446158)!
 
 Используется [vk_api](https://github.com/python273/vk_api),
-[schedule](https://github.com/dbader/schedule).
+[schedule](https://github.com/dbader/schedule),
+[cson](https://github.com/avakar/pycson).
 
 ## Установка & настройка
 
@@ -35,9 +36,22 @@ $ python -m laszlo-vk-bot
 Бот настраивается с помощью переменных окружения.<br/>
 Их полный список можно увидеть в [config.py](./laszlo-vk-bot/config.py).
 
-### Настройка правил
+### Настройка правил (`RULES_PATH`)
+Для начала работы необходимо создать список правил.<br/>
+Он хранится в формате [CSON](https://github.com/bevry/cson), пример есть
+в [rules_example.cson](./rules_example.cson).
 
-###### TODO!
+Отредактируйте файл и скопируйте в место, где бот сможет его прочесть.<br/>
+Кодировка обязательно должна быть `UTF-8`.
+
+Теперь укажите путь к файлу в ENV. На Windows:
+```bat
+> set "LASZLO_RULES_PATH=D:\DEVELOPMENT_IS_MY_LAIFU\Workspaces\laszlo-vk-bot\rules_example.cson"
+```
+или на GNU/Linux:
+```bash
+$ export LASZLO_RULES_PATH='~/saber-nyan/Workspaces/laszlo-vk-bot/rules_example.cson'
+```
 
 ### Получение `GROUP_LINK`
 Это просто ссылка на вашу группу, бот сам извлечет ID.<br/>

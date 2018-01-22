@@ -1,0 +1,22 @@
+[
+  {  # Правило №1
+    post_msg: '''Alright, as I said, new day - new rule.
+Today, rejoicing is the only option, because no other languages are even exist except our lovely ENGLISH, right?
+Still, if you dare to find an alternative, I gonna ban the fuck out of you.
+Also, you are better to not fuck this up, because Aesthetic is on watch.
+
+Btw, you can change the language settings to make it easier for everyone.'''  # Описание правила. Именно этот текст будет вставляться в прикрепленный пост.
+    comment_chk: '''bool(re.search("[\u0400-\u04FF]", comment["text"]))'''  # Скрипт проверки каждого комментария, WIP.
+  }
+  {  # Правило №2
+    post_msg: '''Говорят, что паблик без модерации - это раковник Так как материться и разводить срачи здесь можно,
+я решил что будет разумно придумать хотя бы одно правило, которое сделает нашу жизнь комфортней
+Каждый день я буду его обновлять, чтобы все были в тонусе Сегодня, к примеру, запрещено ставить точки в конце предложений
+Следите за своим поведением, пидоры, здесь вам не ёбаный литературный клуб, мы точек не терпим'''
+    comment_chk: '''"," in comment["text"]'''
+  }
+]  # Дальше по аналогии.
+
+# Пока не понял ситуацию с отступами, они могут быть важны. А может и нет.
+# Если хотим написать ' то пишем \'
+# Если хотим написать \ то пишем \\

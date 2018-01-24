@@ -4,6 +4,7 @@
 """
 import os
 import sys
+import traceback
 from pathlib import Path
 
 try:
@@ -23,7 +24,8 @@ try:  # см. README.md!
     ACCESS_TOKEN_LINK = os.environ['LASZLO_ACCESS_TOKEN_LINK']  # API Token
 except:
     print("Необходимые переменные окружения не найдены или заданы неверно.\n"
-          "Пожалуйста, перечитайте README.md!", file=sys.stderr)
+          "Пожалуйста, перечитайте README.md!\n\nПодробнее:\n{}"
+          .format(traceback.format_exc()), file=sys.stderr)
     sys.exit(EXIT_ENV)
 
 # Через сколько дней должны обновиться правила?

@@ -53,6 +53,7 @@ def change_rule_of_the_day():
     log.info("Правило дня изменяется на {}!")
 
 
+# noinspection PyBroadException
 def main():
     """
     Собственно, основной метод...
@@ -60,7 +61,6 @@ def main():
     :return: код возврата
     """
 
-    # noinspection PyBroadException
     try:
         access_token_regex = re.compile(r'access_token=(.*?)&')
         access_token = access_token_regex.findall(config.ACCESS_TOKEN_LINK)[0]
@@ -69,8 +69,19 @@ def main():
                      exc_info=1)
         return EXIT_ENV
 
+    try:
+        expires_in_regex = re.compile(r'expires_in=(.*?)&')
+        expires_in = int(expires_in_regex.findall(config.ACCESS_TOKEN_LINK)[0])
+    except:
+        expires_in = -1
+
+    if expires_in != 0:
+        log.warning("Похоже, у токена есть срок действия.\n"
+                    "Если вы составляли ссылку сами, то запросите именно \'scope=73728\'!\n"
+                    "\nЧерез некоторое время бот может сломаться.\n"
+                    "Срок действия (сек): {}".format(expires_in))
+
     log.info("Парсинг файла правил...")
-    # noinspection PyBroadException
     try:
         with open(config.RULES_PATH, 'rb') as file:
             global rules
@@ -82,7 +93,6 @@ def main():
         return EXIT_PARSE
 
     log.info("Инициализация vk_api...")
-    # noinspection PyBroadException
     try:
         vk_session = vk_api.VkApi(
             token=access_token,
@@ -98,7 +108,6 @@ def main():
         return EXIT_VK_API
 
     log.info("Определение id группы...")
-    # noinspection PyBroadException
     try:
         group_short_name = config.GROUP_LINK.split('/')[-1]
         global group_id

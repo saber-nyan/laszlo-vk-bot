@@ -12,6 +12,8 @@
 [schedule](https://github.com/dbader/schedule),
 [cson](https://github.com/avakar/pycson).
 
+### TODO [ЗДЕСЬ](https://github.com/saber-nyan/laszlo-vk-bot/issues/1)
+
 ## Установка & настройка
 
 Для GNU/Linux:

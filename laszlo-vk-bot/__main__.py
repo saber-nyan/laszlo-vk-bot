@@ -4,6 +4,7 @@
 """
 import logging
 import os
+import pickle
 import random
 import re
 import signal
@@ -19,38 +20,114 @@ from vk_api import vk_api
 
 try:
     from . import config
+    from . import global_state
 except ImportError:
     import config
+    import global_state
 
 EXIT_SUCCESS = 0  # По сигналу
 EXIT_VK_API = 1  # Ошибка vk_api
 EXIT_ENV = 2  # Некорректные переменные среды
-EXIT_PARSE = 4  # Ошибка открытия/парсинга
+EXIT_PARSE = 4  # Ошибка открытия/парсинга CSON
+EXIT_HOMEDIR = 8  # Ошибка при работе с домашней директорией
+EXIT_PICKLE = 16  # Ошибка открытия/парсинга Pickle
 EXIT_UNKNOWN = 256  # Неведомая хрень
 
 VK_VER = 5.71  # Последняя версия на 2018.01.22
 
+STATE_PKL_PATH = os.path.join(config.HOMEDIR, 'global-state.pkl')
+
 log: logging.Logger
 vk: vk_api.VkApiMethod
+
 rules: List[Dict[str, str]]  # см. rules_example.cson
+RULES_USED = "used"
+RULES_POST_MSG = "post_msg"
+RULES_COMMENT_CHK = "comment_chk"
+"""
+Поля:
+
+- used : использовано ли правило
+- post_msg : сам текст правила
+- comment_chk : скрипт для проверки комментариев, WIP
+"""
+
 group_id: int
 
+state: global_state.BotState
 
+
+# noinspection PyBroadException
 def test_job():
+    """
+    Задание для тестирования логики.
+    """
     log.debug("Запущено тестовое задание!")
-    guid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
-    log.debug("Пост с guid {}...".format(guid))
-    result = vk.wall.post(
-        owner_id="-{}".format(group_id),
-        from_group=1,
-        message="{}".format(random.choice(rules)["post_msg"]),  # TODO: dehardcode
-        signed=1
-    )
-    log.debug("Результат: {}".format(result))
+    if config.DELETE_PREV_POST and state.last_post_id is not None:
+        tries = 1
+        while tries <= 3:
+            try:
+                del_result = vk.wall.delete(
+                    owner_id=group_id,
+                    post_id=state.last_post_id,
+                    version=VK_VER
+                )
+                if del_result != 1:
+                    raise RuntimeError("Response is {}, not \"1\"!".format(del_result))
+                else:
+                    break
+            except:
+                log.warning("Ошибка удаления поста! Ждем 5 секунд, попытка {}/3.\n"
+                            "Подробнее:\n".format(tries), exc_info=1)
+                tries += 1
+                time.sleep(5)
+
+    guid = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
+    msg = random.choice([a for a in rules if not a[RULES_USED]])["post_msg"]
+    log.debug("Пост с guid {}, msg {}".format(guid, msg))
+    tries = 1
+    while True:
+        try:
+            post_result = vk.wall.post(
+                owner_id=group_id,
+                from_group=1,
+                message=msg,
+                signed=1
+            )
+            state.last_post_id = post_result["post_id"]
+            break
+        except:
+            log.warning("Ошибка отправки поста! Ждем 5 секунд, попытка {}.\n"
+                        "Подробнее:\n".format(tries), exc_info=1)
+            tries += 1
+            time.sleep(5)
+
+    log.debug("Результат: {}".format(post_result))
 
 
 def change_rule_of_the_day():
     log.info("Правило дня изменяется на {}!")
+
+
+def load_state(path: str):
+    """
+    Загружает состояние бота из файла `pickle`.
+
+    :param str path: путь к файлу
+    """
+    with open(path, 'rb') as f:
+        global state
+        state = pickle.load(f, fix_imports=False)  # Fuck you, compatibility.
+
+
+def save_state(path: str):
+    """
+    Сохраняет состояние бота в файл `pickle`.
+
+    :param str path: путь к файлу
+    """
+    with open(path, 'wb') as f:
+        pickle.dump(state, f, pickle.HIGHEST_PROTOCOL, fix_imports=False)
 
 
 # noinspection PyBroadException
@@ -60,6 +137,18 @@ def main():
 
     :return: код возврата
     """
+    try:
+        if not os.path.exists(config.HOMEDIR):
+            log.info("Создание домашней директории...")
+            os.makedirs(config.HOMEDIR)
+        elif not os.path.isdir(config.HOMEDIR):
+            log.info("Пересоздание домашней директории...")
+            os.remove(config.HOMEDIR)
+            os.makedirs(config.HOMEDIR)
+    except:
+        log.critical("Ошибка при работе с домашней директорией!\n\nПодробнее:\n",
+                     exc_inf=1)
+        return EXIT_HOMEDIR
 
     try:
         access_token_regex = re.compile(r'access_token=(.*?)&')
@@ -92,6 +181,17 @@ def main():
                      exc_info=1)
         return EXIT_PARSE
 
+    log.info("Парсинг файла состояния...")
+    global state
+    try:
+        load_state(STATE_PKL_PATH)
+        log.info("...успех! Состояние: {}".format(state))
+    except:
+        log.error("Не удалось загрузить файл состояния из \"{}\", начинаю все заного.\n"
+                  "Для настройки пути посмотрите \"config.py\"!\n\n"
+                  "Подробнее:\n".format(STATE_PKL_PATH), exc_info=1)
+        state = global_state.BotState()
+
     log.info("Инициализация vk_api...")
     try:
         vk_session = vk_api.VkApi(
@@ -112,12 +212,29 @@ def main():
         group_short_name = config.GROUP_LINK.split('/')[-1]
         global group_id
         group_id = vk.groups.getById(group_id=group_short_name,
-                                     version=VK_VER)[0]["id"]
+                                     version=VK_VER)[0]["id"] * -1  # Требование ВК: -, если группа.
         log.info("...успех! ID = {}".format(group_id))
     except:
         log.critical("Неправильно задана ссылка на группу.\n\nПодробнее:\n",
                      exc_info=1)
         return EXIT_ENV
+
+    # Почти готово, осталось понять, какие посты мы уже писали...
+    all_used = True
+    for rule in rules:
+        rule_hash = hash(frozenset(rule.items()))
+        is_used = rule_hash in state.used_rules
+        rule[RULES_USED] = is_used
+        if not is_used:
+            all_used = False
+
+    if all_used:
+        state.used_rules = []  # Reset all hashes...
+        for rule in rules:
+            rule[RULES_USED] = False  # ...and keys.
+    # FIXME: Выглядит тупо, как сделать по-другому?
+
+    log.info("Запущен.")
 
     if config.DEBUG:
         schedule.every(10).seconds.do(test_job).tag('test-job')
@@ -138,6 +255,15 @@ def exit_handler(sig, frame):
     :param frame: фрейм, во время выполнения которого был пойман сигнал
     """
     log.info("Остановка...")
+    # noinspection PyBroadException
+    try:
+        save_state(STATE_PKL_PATH)
+    except:
+        log.error("Ошибка при сохранении состояния!\n"
+                  "У вас есть права на запись в \"{}\"? См. \"config.py\" для настройки директорий.\n\n"
+                  "Подробнее:\n".format(STATE_PKL_PATH), exc_info=1)
+        sys.exit(EXIT_PICKLE)
+    print("bye!")
     sys.exit(EXIT_SUCCESS)
 
 
@@ -159,6 +285,12 @@ if __name__ == '__main__':
     try:
         sys.exit(main())
     except Exception:
+        # noinspection PyBroadException
+        try:
+            save_state(STATE_PKL_PATH)
+        except:
+            log.error("Ошибка при сохранении после критической ошибки!\n\n",
+                      exc_info=1)
         err_str = """
 Случилась неведомая хрень...
 

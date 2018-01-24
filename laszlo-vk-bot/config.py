@@ -7,11 +7,6 @@ import sys
 import traceback
 from pathlib import Path
 
-try:
-    from .__main__ import EXIT_ENV
-except ImportError:
-    from __main__ import EXIT_ENV
-
 # настройка = os.getenv('ключ', умолчание)
 
 # Префиксы LASZLO для устранения конфликтов с другими переменными.
@@ -26,13 +21,16 @@ except:
     print("Необходимые переменные окружения не найдены или заданы неверно.\n"
           "Пожалуйста, перечитайте README.md!\n\nПодробнее:\n{}"
           .format(traceback.format_exc()), file=sys.stderr)
-    sys.exit(EXIT_ENV)
+    sys.exit(2)  # Рекурсивные импорты - плохо.
 
 # Через сколько дней должны обновиться правила?
 DAYS = int(os.getenv('LASZLO_DAYS', 1))
 
+# Удалять старый пост с правилами после постинга нового? Если '1', то да.
+DELETE_PREV_POST = True if os.getenv('LASZLO_DELETE_PREV_POST', 1) == 1 else False
 
-# Домашняя директория бота. Должны быть права на запись.
+
+# Домашняя директория бота. Должны быть права на запись, грузит состояние оттуда.
 HOMEDIR = os.getenv('LASZLO_HOMEDIR', os.path.join(Path.home(), '.laszlo-vk-bot'))
 
 # Режим отладки.

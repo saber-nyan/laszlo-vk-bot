@@ -23,9 +23,21 @@ class BotState:
     Хэшируется как ``hash(frozenset(o[0].items()))``
     """
 
+    now_ticks: int
+    """
+    Количество прошедших тиков.
+    """
+
+    trigger_count: int
+    """
+    Количество срабатываний (смен правила).
+    """
+
     def __init__(self):
         self.last_post_id = None
         self.used_rules = []
+        self.now_ticks = 0
+        self.trigger_count = 0
 
     def __str(self):
         return "STATE: Last post #{}; used {}".format(self.last_post_id,

@@ -10,12 +10,10 @@ import re
 import signal
 import string
 import sys
-import tempfile
 import time
 from typing import Dict, List
 
 import cson
-import schedule
 from vk_api import vk_api
 
 try:
@@ -65,7 +63,7 @@ def test_job():
     log.debug("Запущено тестовое задание!")
     if config.DELETE_PREV_POST and state.last_post_id is not None:
         tries = 1
-        while tries <= 3:
+        while True:
             try:
                 del_result = vk.wall.delete(
                     owner_id=group_id,
@@ -77,15 +75,18 @@ def test_job():
                 else:
                     break
             except:
-                log.warning("Ошибка удаления поста! Ждем 5 секунд, попытка {}/3.\n"
-                            "Подробнее:\n".format(tries), exc_info=1)
+                log.warning("Ошибка удаления поста! Ждем 5 секунд, попытка {}/{}.\n"
+                            "Подробнее:\n".format(tries, config.DELETE_MAX_TRIES), exc_info=1)
                 tries += 1
                 time.sleep(5)
-
+                # noinspection PyChainedComparisons
+                if config.DELETE_MAX_TRIES > -1 and tries > config.DELETE_MAX_TRIES:
+                    break
     guid = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
     msg = random.choice([a for a in rules if not a[RULES_USED]])["post_msg"]
     log.debug("Пост с guid {}, msg {}".format(guid, msg))
     tries = 1
+    post_result = None
     while True:
         try:
             post_result = vk.wall.post(
@@ -97,12 +98,17 @@ def test_job():
             state.last_post_id = post_result["post_id"]
             break
         except:
-            log.warning("Ошибка отправки поста! Ждем 5 секунд, попытка {}.\n"
-                        "Подробнее:\n".format(tries), exc_info=1)
+            log.warning("Ошибка отправки поста! Ждем 5 секунд, попытка {}/{}.\n"
+                        "Подробнее:\n".format(tries, config.POST_MAX_TRIES), exc_info=1)
             tries += 1
             time.sleep(5)
-
-    log.debug("Результат: {}".format(post_result))
+            # noinspection PyChainedComparisons
+            if config.POST_MAX_TRIES > -1 and tries > config.POST_MAX_TRIES:
+                break
+    if post_result is not None:
+        log.debug("Результат: {}".format(post_result))
+    else:
+        log.error("Задание выполнено с ошибкой!")
 
 
 def change_rule_of_the_day():
@@ -187,7 +193,7 @@ def main():
         load_state(STATE_PKL_PATH)
         log.info("...успех! Состояние: {}".format(state))
     except:
-        log.error("Не удалось загрузить файл состояния из \"{}\", начинаю все заного.\n"
+        log.error("Не удалось загрузить файл состояния из \"{}\", начинаю все заново.\n"
                   "Для настройки пути посмотрите \"config.py\"!\n\n"
                   "Подробнее:\n".format(STATE_PKL_PATH), exc_info=1)
         state = global_state.BotState()
@@ -196,7 +202,7 @@ def main():
     try:
         vk_session = vk_api.VkApi(
             token=access_token,
-            config_filename=os.path.join(tempfile.gettempdir(), 'laszlo_vk_data.json'),
+            config_filename=os.path.join(config.HOMEDIR, 'laszlo_vk_data.json'),
             api_version=str(VK_VER)
         )
         global vk
@@ -234,16 +240,38 @@ def main():
             rule[RULES_USED] = False  # ...and keys.
     # FIXME: Выглядит тупо, как сделать по-другому?
 
+    ticks_to_update = int((86400 * config.DAYS) / config.TICK_DELAY)  # convert to ticks
+    secs_to_sleep = 86400 * config.REST_DAYS  # convert to secs
+    log.debug("TICK_DELAY = {}; update rule every {} ticks, "
+              "sleep every {} rule updates for {} secs"
+              .format(config.TICK_DELAY, ticks_to_update, config.REST, secs_to_sleep))
+
     log.info("Запущен.")
 
-    if config.DEBUG:
-        schedule.every(10).seconds.do(test_job).tag('test-job')
-    else:
-        schedule.every(config.DAYS).do()
-
     while True:
-        schedule.run_pending()
-        time.sleep(1)  # Странное решение, но ЦП грузит не особо: около 200к циклов
+        if config.DEBUG:
+            time.sleep(config.TICK_DELAY)
+            log.debug("TICK! now_ticks = {}".format(state.now_ticks))
+            state.now_ticks += 1
+            if state.now_ticks >= 4:
+                log.debug("running job!")
+                state.now_ticks = 0
+                state.trigger_count += 1
+                test_job()
+                if 0 < secs_to_sleep and 0 < config.REST <= state.trigger_count:
+                    log.debug("rest!")
+                    state.trigger_count = 0
+                    time.sleep(secs_to_sleep)
+        else:
+            time.sleep(config.TICK_DELAY)
+            state.now_ticks += 1
+            if state.now_ticks >= ticks_to_update:
+                state.now_ticks = 0
+                state.trigger_count += 1
+                change_rule_of_the_day()
+                if 0 < secs_to_sleep and 0 < config.REST <= state.trigger_count:
+                    state.trigger_count = 0
+                    time.sleep(secs_to_sleep)
 
 
 # noinspection PyUnusedLocal

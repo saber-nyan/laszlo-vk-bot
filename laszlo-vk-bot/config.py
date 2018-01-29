@@ -24,11 +24,27 @@ except:
     sys.exit(2)  # Рекурсивные импорты - плохо.
 
 # Через сколько дней должны обновиться правила?
-DAYS = int(os.getenv('LASZLO_DAYS', 1))
+DAYS = float(os.getenv('LASZLO_DAYS', 1))
+
+# Через сколько *смен правил* бот должен дать передышку длиной в REST_DAYS?
+# Важно, что это не дни, а срабатывания!
+# -1 = отключить
+REST = int(os.getenv('LASZLO_REST', -1))
+
+# Длина передышки, в днях.
+REST_DAYS = float(os.getenv('LASZLO_REST_DAYS', -1))
 
 # Удалять старый пост с правилами после постинга нового? Если '1', то да.
 DELETE_PREV_POST = True if os.getenv('LASZLO_DELETE_PREV_POST', 1) == 1 else False
 
+# Количество попыток удалить старый пост. -1 = бесконечно, не рекомендую
+DELETE_MAX_TRIES = int(os.getenv('LASZLO_DELETE_MAX_TRIES', 3))
+
+# Количество попыток отправить пост. -1 = бесконечно, не рекомендую
+POST_MAX_TRIES = int(os.getenv('LASZLO_POST_MAX_TRIES', 100))
+
+# Задержка между тиками, в секундах. Чем меньше - тем точнее таймер, но сильнее нагружается ЦП.
+TICK_DELAY = float(os.getenv('LASZLO_TICK_DELAY', 10))
 
 # Домашняя директория бота. Должны быть права на запись, грузит состояние оттуда.
 HOMEDIR = os.getenv('LASZLO_HOMEDIR', os.path.join(Path.home(), '.laszlo-vk-bot'))

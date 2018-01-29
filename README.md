@@ -9,7 +9,6 @@
 Спасибо, [Дихлорид Карбонила](https://vk.com/id370446158)!
 
 Используется [vk_api](https://github.com/python273/vk_api),
-[schedule](https://github.com/dbader/schedule),
 [cson](https://github.com/avakar/pycson).
 
 ### TODO [ЗДЕСЬ](https://github.com/saber-nyan/laszlo-vk-bot/issues/1)

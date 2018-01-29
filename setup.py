@@ -20,7 +20,6 @@ setup(
     license='WTFPL',
     install_requires=[
         'vk_api',
-        'schedule',
         'cson',
     ],
     packages=find_packages(),

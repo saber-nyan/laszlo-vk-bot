@@ -55,12 +55,22 @@ group_id: int
 state: global_state.BotState
 
 
+def reset_rules():
+    """
+    Сбрасывает состояние "использованности" всех правил.
+    """
+    log.debug("Сброс правил!")
+    state.used_rules = []  # Reset all hashes...
+    for rule in rules:
+        rule[RULES_USED] = False  # ...and keys.
+
+
 # noinspection PyBroadException
-def test_job():
+def update_rule_job():
     """
-    Задание для тестирования логики.
+    Задание обновления правила.
     """
-    log.debug("Запущено тестовое задание!")
+    log.debug("Обновление правила запущено!")
     if config.DELETE_PREV_POST and state.last_post_id is not None:
         tries = 1
         while True:
@@ -79,11 +89,11 @@ def test_job():
                             "Подробнее:\n".format(tries, config.DELETE_MAX_TRIES), exc_info=1)
                 tries += 1
                 time.sleep(5)
-                # noinspection PyChainedComparisons
-                if config.DELETE_MAX_TRIES > -1 and tries > config.DELETE_MAX_TRIES:
+                if -1 < config.DELETE_MAX_TRIES < tries:
                     break
     guid = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
-    msg = random.choice([a for a in rules if not a[RULES_USED]])["post_msg"]
+    rule: Dict[str, str] = random.choice([a for a in rules if not a[RULES_USED]])
+    msg: str = rule[RULES_POST_MSG]
     log.debug("Пост с guid {}, msg {}".format(guid, msg))
     tries = 1
     post_result = None
@@ -102,17 +112,21 @@ def test_job():
                         "Подробнее:\n".format(tries, config.POST_MAX_TRIES), exc_info=1)
             tries += 1
             time.sleep(5)
-            # noinspection PyChainedComparisons
-            if config.POST_MAX_TRIES > -1 and tries > config.POST_MAX_TRIES:
+            if -1 < config.POST_MAX_TRIES < tries:
                 break
     if post_result is not None:
+        rule[RULES_USED] = True
         log.debug("Результат: {}".format(post_result))
+
+        all_used = True
+        for rule in rules:
+            if not rule[RULES_USED]:
+                all_used = False
+
+        if all_used:
+            reset_rules()
     else:
         log.error("Задание выполнено с ошибкой!")
-
-
-def change_rule_of_the_day():
-    log.info("Правило дня изменяется на {}!")
 
 
 def load_state(path: str):
@@ -235,9 +249,7 @@ def main():
             all_used = False
 
     if all_used:
-        state.used_rules = []  # Reset all hashes...
-        for rule in rules:
-            rule[RULES_USED] = False  # ...and keys.
+        reset_rules()
     # FIXME: Выглядит тупо, как сделать по-другому?
 
     ticks_to_update = int((86400 * config.DAYS) / config.TICK_DELAY)  # convert to ticks
@@ -257,7 +269,7 @@ def main():
                 log.debug("running job!")
                 state.now_ticks = 0
                 state.trigger_count += 1
-                test_job()
+                update_rule_job()
                 if 0 < secs_to_sleep and 0 < config.REST <= state.trigger_count:
                     log.debug("rest!")
                     state.trigger_count = 0
@@ -268,7 +280,7 @@ def main():
             if state.now_ticks >= ticks_to_update:
                 state.now_ticks = 0
                 state.trigger_count += 1
-                change_rule_of_the_day()
+                update_rule_job()
                 if 0 < secs_to_sleep and 0 < config.REST <= state.trigger_count:
                     state.trigger_count = 0
                     time.sleep(secs_to_sleep)

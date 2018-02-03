@@ -11,7 +11,7 @@ with open('README.md', mode='r', encoding='utf-8') as f:
 
 setup(
     name='laszlo-vk-bot',
-    version='0.0.0.1',
+    version='1.0.0.0',
     description='НИКТО НЕ УЙДЕТ ОБИЖЕННЫМ',
     long_description=readme,
     author='saber-nyan',
